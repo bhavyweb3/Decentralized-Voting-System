@@ -1,0 +1,1365 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoteChain — Decentralized Voting</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #080b10;
+        --surface: #0e1420;
+        --card: #131c2e;
+        --border: #1e2d47;
+        --accent: #00e5ff;
+        --accent2: #7c3aed;
+        --green: #00ff9d;
+        --red: #ff3c5a;
+        --text: #e2eaf8;
+        --muted: #5a6a85;
+        --mono: "DM Mono", monospace;
+        --sans: "Syne", sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ── Grid bg ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+        background-size: 48px 48px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ─── HEADER ─── */
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 2rem;
+        height: 64px;
+        background: rgba(8, 11, 16, 0.85);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .logo {
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .logo span {
+        font-weight: 400;
+        opacity: 0.6;
+      }
+
+      #walletBtn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 1.1rem;
+        background: transparent;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          box-shadow 0.2s;
+      }
+      #walletBtn:hover {
+        background: rgba(0, 229, 255, 0.08);
+        box-shadow: 0 0 14px rgba(0, 229, 255, 0.2);
+      }
+      #walletBtn.connected {
+        border-color: var(--green);
+        color: var(--green);
+      }
+      #walletBtn.connected:hover {
+        background: rgba(0, 255, 157, 0.08);
+        box-shadow: 0 0 14px rgba(0, 255, 157, 0.2);
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      /* ─── SETUP BANNER ─── */
+      #setupBanner {
+        background: linear-gradient(
+          90deg,
+          rgba(124, 58, 237, 0.15),
+          rgba(0, 229, 255, 0.1)
+        );
+        border-bottom: 1px solid var(--border);
+        padding: 0.75rem 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      #setupBanner label {
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      #contractInput {
+        flex: 1;
+        min-width: 260px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 6px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      #contractInput:focus {
+        border-color: var(--accent);
+      }
+      #loadBtn {
+        padding: 0.45rem 1.1rem;
+        background: var(--accent2);
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        font-family: var(--sans);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          opacity 0.2s,
+          transform 0.1s;
+      }
+      #loadBtn:hover {
+        opacity: 0.85;
+      }
+      #loadBtn:active {
+        transform: scale(0.97);
+      }
+
+      /* ─── LAYOUT ─── */
+      main {
+        position: relative;
+        z-index: 1;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      /* ─── SIDEBAR ─── */
+      aside {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem;
+      }
+      .panel-title {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 1rem;
+      }
+
+      /* election list */
+      #electionList {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .election-item {
+        padding: 0.65rem 0.85rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .election-item:hover,
+      .election-item.active {
+        border-color: var(--accent);
+        background: rgba(0, 229, 255, 0.04);
+      }
+      .election-item .el-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      .election-item .el-status {
+        font-size: 0.72rem;
+        font-family: var(--mono);
+        margin-top: 0.2rem;
+      }
+      .status-pending {
+        color: var(--muted);
+      }
+      .status-active {
+        color: var(--green);
+      }
+      .status-ended {
+        color: var(--red);
+      }
+      .status-finalized {
+        color: var(--accent);
+      }
+
+      /* ─── CONTENT AREA ─── */
+      .content {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      /* ─── TABS ─── */
+      .tabs {
+        display: flex;
+        gap: 0.25rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.3rem;
+      }
+      .tab {
+        flex: 1;
+        padding: 0.5rem;
+        text-align: center;
+        font-size: 0.82rem;
+        font-weight: 600;
+        border-radius: 7px;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          color 0.2s;
+        color: var(--muted);
+        border: none;
+        background: transparent;
+      }
+      .tab.active {
+        background: var(--card);
+        color: var(--text);
+      }
+
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      /* ─── ELECTION HERO ─── */
+      .election-hero {
+        background: linear-gradient(135deg, #0e1a2e, #111827);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.75rem;
+        position: relative;
+        overflow: hidden;
+      }
+      .election-hero::after {
+        content: "";
+        position: absolute;
+        top: -40px;
+        right: -40px;
+        width: 180px;
+        height: 180px;
+        background: radial-gradient(
+          circle,
+          rgba(0, 229, 255, 0.08),
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+      .election-hero h2 {
+        font-size: 1.6rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .election-hero .meta {
+        display: flex;
+        gap: 1.5rem;
+        margin-top: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .meta-item {
+        font-size: 0.78rem;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+      .meta-item span {
+        color: var(--text);
+        display: block;
+        margin-top: 0.1rem;
+      }
+
+      /* ─── PROPOSALS GRID ─── */
+      .proposals-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.85rem;
+      }
+      .proposal-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1.1rem;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          transform 0.15s,
+          box-shadow 0.2s;
+        position: relative;
+      }
+      .proposal-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent2);
+        box-shadow: 0 4px 20px rgba(124, 58, 237, 0.15);
+      }
+      .proposal-card.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25);
+      }
+      .proposal-card .p-id {
+        font-size: 0.7rem;
+        font-family: var(--mono);
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+      }
+      .proposal-card .p-name {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .proposal-card .p-desc {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.35rem;
+        line-height: 1.5;
+      }
+      .proposal-card .p-votes {
+        margin-top: 0.85rem;
+        font-size: 0.8rem;
+        font-family: var(--mono);
+        color: var(--accent);
+      }
+      .vote-bar {
+        height: 3px;
+        background: var(--border);
+        border-radius: 2px;
+        margin-top: 0.4rem;
+      }
+      .vote-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+        border-radius: 2px;
+        transition: width 0.5s ease;
+      }
+
+      /* ─── FORMS ─── */
+      .form-grid {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      
+      label.field-label {
+        font-size: 0.75rem;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+      input.field,
+      textarea.field {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.85rem;
+        padding: 0.55rem 0.8rem;
+        border-radius: 8px;
+        outline: none;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+      input.field:focus,
+      textarea.field:focus {
+        border-color: var(--accent);
+      }
+      textarea.field {
+        resize: vertical;
+        min-height: 70px;
+      }
+
+      .btn {
+        padding: 0.6rem 1.25rem;
+        border: none;
+        border-radius: 8px;
+        font-family: var(--sans);
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          opacity 0.2s,
+          transform 0.1s,
+          box-shadow 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+      }
+      .btn:hover {
+        opacity: 0.88;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent2), #4f46e5);
+        color: #fff;
+      }
+      .btn-accent {
+        background: linear-gradient(135deg, var(--accent), #0099bb);
+        color: #000;
+      }
+      .btn-danger {
+        background: linear-gradient(135deg, var(--red), #aa1130);
+        color: #fff;
+      }
+      .btn-ghost {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      .btn-ghost:hover {
+        border-color: var(--text);
+        color: var(--text);
+      }
+
+      /* ─── TOAST ─── */
+      #toastContainer {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        z-index: 999;
+      }
+      .toast {
+        padding: 0.75rem 1.1rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 0.83rem;
+        font-family: var(--mono);
+        min-width: 280px;
+        animation: slideIn 0.25s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .toast.success {
+        border-color: var(--green);
+        color: var(--green);
+      }
+      .toast.error {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      .toast.info {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(20px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* ─── LOADER ─── */
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* empty state */
+      .empty {
+        text-align: center;
+        padding: 2.5rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      /* tx hash */
+      .tx-link {
+        font-size: 0.75rem;
+        font-family: var(--mono);
+        color: var(--accent);
+        text-decoration: none;
+        word-break: break-all;
+      }
+      .tx-link:hover {
+        text-decoration: underline;
+      }
+
+      .row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .row > * {
+        flex: 1;
+        min-width: 140px;
+      }
+
+      /* ─── RESPONSIVE ─── */
+      @media (max-width: 768px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header>
+      <div class="logo">Vote<span>Chain</span></div>
+      <button id="walletBtn"><span class="dot"></span>Connect Wallet</button>
+    </header>
+
+    <!-- CONTRACT SETUP -->
+    <div id="setupBanner">
+      <label>Contract Address (Sepolia):</label>
+      <input
+        id="contractInput"
+        type="text"
+        placeholder="0x..."
+        spellcheck="false"
+      />
+      <button id="loadBtn">Load Contract</button>
+    </div>
+
+    <!-- MAIN -->
+    <main>
+      <!-- SIDEBAR -->
+      <aside>
+        <div class="panel">
+          <div class="panel-title">Elections</div>
+          <div id="electionList">
+            <div class="empty">No elections loaded</div>
+          </div>
+          <button
+            class="btn btn-ghost"
+            style="margin-top: 0.75rem; width: 100%; font-size: 0.8rem"
+            id="refreshBtn"
+          >
+            ↻ Refresh
+          </button>
+        </div>
+
+        <!-- admin: create election -->
+        <div class="panel" id="adminPanel" style="display: none">
+          <div class="panel-title">⚡ Admin — New Election</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="field-label">Title</label>
+              <input
+                class="field"
+                id="elTitle"
+                placeholder="Board Election 2025"
+              />
+            </div>
+            <div class="row">
+              <div class="form-group">
+                <label class="field-label">Start (local)</label>
+                <input class="field" id="elStart" type="datetime-local" />
+              </div>
+              <div class="form-group">
+                <label class="field-label">End (local)</label>
+                <input class="field" id="elEnd" type="datetime-local" />
+              </div>
+            </div>
+            <button class="btn btn-primary" id="createElBtn">
+              Create Election
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CONTENT -->
+      <section class="content">
+        <div
+          id="noElection"
+          class="panel"
+          style="text-align: center; padding: 3rem"
+        >
+          <div style="font-size: 2.5rem; margin-bottom: 1rem">🗳️</div>
+          <div
+            style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem"
+          >
+            Welcome to VoteChain
+          </div>
+          <div style="color: var(--muted); font-size: 0.88rem">
+            Paste your contract address above and click Load Contract to begin.
+          </div>
+        </div>
+
+        <div id="electionView" style="display: none">
+          <!-- HERO -->
+          <div class="election-hero" id="electionHero"></div>
+
+          <!-- TABS -->
+          <div class="tabs">
+            <button class="tab active" data-tab="vote">Vote</button>
+            <button class="tab" data-tab="results">Results</button>
+            <button class="tab" data-tab="delegate">Delegate</button>
+            <button
+              class="tab"
+              data-tab="manage"
+              id="manageTab"
+              style="display: none"
+            >
+              Manage
+            </button>
+          </div>
+
+          <!-- VOTE TAB -->
+          <div class="tab-content active" id="tab-vote">
+            <div class="panel">
+              <div class="panel-title">
+                Proposals — click to select, then cast vote
+              </div>
+              <div class="proposals-grid" id="proposalsGrid"></div>
+              <div
+                style="
+                  margin-top: 1rem;
+                  display: flex;
+                  gap: 0.75rem;
+                  align-items: center;
+                  flex-wrap: wrap;
+                "
+              >
+                <button class="btn btn-accent" id="castVoteBtn" disabled>
+                  Cast Vote
+                </button>
+                <span
+                  id="voteStatus"
+                  style="
+                    font-size: 0.8rem;
+                    color: var(--muted);
+                    font-family: var(--mono);
+                  "
+                ></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RESULTS TAB -->
+          <div class="tab-content" id="tab-results">
+            <div class="panel">
+              <div class="panel-title">Live Tallies</div>
+              <div id="resultsView"></div>
+              <div style="margin-top: 1rem" id="finalizeSection"></div>
+            </div>
+          </div>
+
+          <!-- DELEGATE TAB -->
+          <div class="tab-content" id="tab-delegate">
+            <div class="panel">
+              <div class="panel-title">Delegate Your Vote</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="field-label">Delegate to Address</label>
+                  <input class="field" id="delegateAddr" placeholder="0x..." />
+                </div>
+                <button class="btn btn-primary" id="delegateBtn">
+                  Delegate
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MANAGE TAB (admin) -->
+          <div class="tab-content" id="tab-manage">
+            <!-- Add Proposal -->
+            <div class="panel">
+              <div class="panel-title">Add Proposal</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="field-label">Name</label>
+                  <input
+                    class="field"
+                    id="propName"
+                    placeholder="Candidate / Option name"
+                  />
+                </div>
+                <div class="form-group">
+                  <label class="field-label">Description</label>
+                  <textarea
+                    class="field"
+                    id="propDesc"
+                    placeholder="Brief description..."
+                  ></textarea>
+                </div>
+                <button class="btn btn-primary" id="addPropBtn">
+                  Add Proposal
+                </button>
+              </div>
+            </div>
+
+            <!-- Register Voters -->
+            <div class="panel">
+              <div class="panel-title">Register Voters</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="field-label"
+                    >Addresses (one per line or comma-separated)</label
+                  >
+                  <textarea
+                    class="field"
+                    id="voterAddrs"
+                    placeholder="0xABC...\n0xDEF..."
+                    style="min-height: 100px"
+                  ></textarea>
+                </div>
+                <button class="btn btn-primary" id="regVotersBtn">
+                  Register Voters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- TOASTS -->
+    <div id="toastContainer"></div>
+
+    <script>
+      // ─────────────────────────── ABI ───────────────────────────
+      const ABI = [
+        "function admin() view returns (address)",
+        "function electionCount() view returns (uint256)",
+        "function elections(uint256) view returns (string title, uint256 startTime, uint256 endTime, bool exists, bool resultsFinalized, uint256 winningProposalId, uint256 totalVotes)",
+        "function getProposalCount(uint256) view returns (uint256)",
+        "function getProposal(uint256, uint256) view returns (string name, string description, uint256 voteCount)",
+        "function getAllProposals(uint256) view returns (tuple(string name, string description, uint256 voteCount)[])",
+        "function getVoterInfo(uint256, address) view returns (bool isRegistered, bool hasVoted, address delegate, uint256 weight, uint256 votedProposalId)",
+        "function getElectionStatus(uint256) view returns (string)",
+        "function getWinner(uint256) view returns (uint256 winningProposalId, string winnerName, uint256 voteCount)",
+        "function createElection(string, uint256, uint256) returns (uint256)",
+        "function addProposal(uint256, string, string)",
+        "function registerVoter(uint256, address)",
+        "function registerVotersBatch(uint256, address[])",
+        "function delegateVote(uint256, address)",
+        "function castVote(uint256, uint256)",
+        "function finalizeElection(uint256)",
+        "event ElectionCreated(uint256 indexed, string, uint256, uint256)",
+        "event VoteCast(uint256 indexed, address indexed, uint256 indexed, uint256)",
+      ];
+
+      // ─────────────────────────── STATE ───────────────────────────
+      let provider, signer, contract;
+      let walletAddress = null;
+      let contractAdmin = null;
+      let currentElectionId = null;
+      let selectedProposalId = null;
+      let elections = [];
+
+      // ─────────────────────────── UTILS ───────────────────────────
+      function toast(msg, type = "info", txHash = null) {
+        const c = document.getElementById("toastContainer");
+        const t = document.createElement("div");
+        t.className = `toast ${type}`;
+        const icon = type === "success" ? "✓" : type === "error" ? "✗" : "ℹ";
+        t.innerHTML = `<span>${icon}</span><span>${msg}${txHash ? `<br><a class="tx-link" href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank">${txHash.slice(0, 18)}…</a>` : ""}</span>`;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 5000);
+      }
+
+      function setLoading(btn, loading) {
+        if (loading) {
+          btn.dataset.orig = btn.innerHTML;
+          btn.innerHTML = `<span class="spinner"></span> Waiting…`;
+          btn.disabled = true;
+        } else {
+          btn.innerHTML = btn.dataset.orig;
+          btn.disabled = false;
+        }
+      }
+
+      function fmt(ts) {
+        return ts === 0n ? "—" : new Date(Number(ts) * 1000).toLocaleString();
+      }
+
+      function statusClass(s) {
+        if (s === "Active") return "status-active";
+        if (s === "Pending") return "status-pending";
+        if (s.startsWith("Ended") || s === "Finalized")
+          return "status-finalized";
+        return "status-ended";
+      }
+
+      // ─────────────────────────── WALLET ───────────────────────────
+      document
+        .getElementById("walletBtn")
+        .addEventListener("click", connectWallet);
+
+      // Wait up to 3s for MetaMask to inject window.ethereum
+      function waitForEthereum(timeout = 3000) {
+        return new Promise((resolve) => {
+          if (window.ethereum) return resolve(window.ethereum);
+          let elapsed = 0;
+          const interval = setInterval(() => {
+            elapsed += 100;
+            if (window.ethereum) {
+              clearInterval(interval);
+              resolve(window.ethereum);
+            } else if (elapsed >= timeout) {
+              clearInterval(interval);
+              resolve(null);
+            }
+          }, 100);
+        });
+      }
+
+      async function connectWallet() {
+        const ethereum = await waitForEthereum();
+        if (!ethereum) {
+          toast(
+            "MetaMask not detected. Make sure it's unlocked and refresh the page.",
+            "error",
+          );
+          // Show helpful hint if opened as file://
+          if (location.protocol === "file:") {
+            toast(
+              "⚠ You opened this as a local file. Serve it via a local server (e.g. VS Code Live Server) for MetaMask to work.",
+              "error",
+            );
+          }
+          return;
+        }
+        try {
+          provider = new ethers.BrowserProvider(ethereum);
+          await provider.send("eth_requestAccounts", []);
+
+          const network = await provider.getNetwork();
+          if (network.chainId !== 11155111n) {
+            toast("Please switch MetaMask to Sepolia Testnet", "error");
+            await ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: "0xaa36a7" }],
+            });
+          }
+
+          signer = await provider.getSigner();
+          walletAddress = await signer.getAddress();
+
+          const btn = document.getElementById("walletBtn");
+          btn.classList.add("connected");
+          btn.innerHTML = `<span class="dot"></span>${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`;
+          toast(
+            `Connected: ${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`,
+            "success",
+          );
+
+          if (contract) await onContractLoaded();
+        } catch (e) {
+          toast(e.message || "Wallet connection failed", "error");
+        }
+      }
+
+      // ─────────────────────────── CONTRACT ───────────────────────────
+      document
+        .getElementById("loadBtn")
+        .addEventListener("click", loadContract);
+      document
+        .getElementById("contractInput")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") loadContract();
+        });
+
+      async function loadContract() {
+        const addr = document.getElementById("contractInput").value.trim();
+        if (!ethers.isAddress(addr)) {
+          toast("Invalid contract address", "error");
+          return;
+        }
+        if (!provider) {
+          toast("Connect your wallet first", "error");
+          await connectWallet();
+          return;
+        }
+        try {
+          contract = new ethers.Contract(addr, ABI, signer || provider);
+          await onContractLoaded();
+          toast("Contract loaded ✓", "success");
+        } catch (e) {
+          toast("Failed to load contract: " + e.message, "error");
+        }
+      }
+
+      async function onContractLoaded() {
+        if (!contract) return;
+        try {
+          contractAdmin = (await contract.admin()).toLowerCase();
+          const isAdmin =
+            walletAddress && walletAddress.toLowerCase() === contractAdmin;
+          document.getElementById("adminPanel").style.display = isAdmin
+            ? ""
+            : "none";
+          document.getElementById("manageTab").style.display = isAdmin
+            ? ""
+            : "none";
+          await loadElections();
+        } catch (e) {
+          toast("Contract interaction error: " + e.message, "error");
+        }
+      }
+
+      document
+        .getElementById("refreshBtn")
+        .addEventListener("click", loadElections);
+
+      async function loadElections() {
+        if (!contract) return;
+        try {
+          const count = Number(await contract.electionCount());
+          elections = [];
+          for (let i = 0; i < count; i++) {
+            const el = await contract.elections(i);
+            const status = await contract.getElectionStatus(i);
+            elections.push({
+              id: i,
+              title: el.title,
+              startTime: el.startTime,
+              endTime: el.endTime,
+              resultsFinalized: el.resultsFinalized,
+              totalVotes: el.totalVotes,
+              status,
+            });
+          }
+          renderElectionList();
+          if (currentElectionId !== null) renderElection(currentElectionId);
+        } catch (e) {
+          toast("Error loading elections: " + e.message, "error");
+        }
+      }
+
+      function renderElectionList() {
+        const list = document.getElementById("electionList");
+        if (!elections.length) {
+          list.innerHTML = '<div class="empty">No elections yet</div>';
+          return;
+        }
+        list.innerHTML = elections
+          .map(
+            (e) => `
+    <div class="election-item ${currentElectionId === e.id ? "active" : ""}" onclick="selectElection(${e.id})">
+      <div class="el-title">${e.title}</div>
+      <div class="el-status ${statusClass(e.status)}">${e.status}</div>
+    </div>
+  `,
+          )
+          .join("");
+      }
+
+      async function selectElection(id) {
+        currentElectionId = id;
+        selectedProposalId = null;
+        renderElectionList();
+        await renderElection(id);
+      }
+
+      async function renderElection(id) {
+        const el = elections[id];
+        document.getElementById("noElection").style.display = "none";
+        document.getElementById("electionView").style.display = "";
+
+        // hero
+        document.getElementById("electionHero").innerHTML = `
+    <div style="font-size:.7rem;font-family:var(--mono);color:var(--muted);margin-bottom:.35rem">Election #${id}</div>
+    <h2>${el.title}</h2>
+    <div class="meta">
+      <div class="meta-item">Status<span class="${statusClass(el.status)}">${el.status}</span></div>
+      <div class="meta-item">Start<span>${fmt(el.startTime)}</span></div>
+      <div class="meta-item">End<span>${fmt(el.endTime)}</span></div>
+      <div class="meta-item">Total Votes<span>${el.totalVotes.toString()}</span></div>
+    </div>`;
+
+        // proposals
+        await renderProposals(id);
+        await renderResults(id);
+        await updateVoteStatus(id);
+        renderFinalizeSection(id);
+      }
+
+      async function renderProposals(elId) {
+        const grid = document.getElementById("proposalsGrid");
+        try {
+          const props = await contract.getAllProposals(elId);
+          if (!props.length) {
+            grid.innerHTML = '<div class="empty">No proposals added yet</div>';
+            return;
+          }
+
+          const totalVotes = elections[elId].totalVotes;
+          grid.innerHTML = props
+            .map((p, i) => {
+              const pct =
+                totalVotes > 0n ? Number((p.voteCount * 100n) / totalVotes) : 0;
+              return `
+        <div class="proposal-card ${selectedProposalId === i ? "selected" : ""}" onclick="selectProposal(${i})">
+          <div class="p-id">Proposal #${i}</div>
+          <div class="p-name">${p.name}</div>
+          <div class="p-desc">${p.description}</div>
+          <div class="p-votes">${p.voteCount.toString()} votes (${pct}%)</div>
+          <div class="vote-bar"><div class="vote-bar-fill" style="width:${pct}%"></div></div>
+        </div>`;
+            })
+            .join("");
+        } catch (e) {
+          grid.innerHTML = '<div class="empty">Error loading proposals</div>';
+        }
+      }
+
+      function selectProposal(id) {
+        selectedProposalId = id;
+        document.querySelectorAll(".proposal-card").forEach((c, i) => {
+          c.classList.toggle("selected", i === id);
+        });
+        document.getElementById("castVoteBtn").disabled = false;
+        document.getElementById("voteStatus").textContent =
+          `Selected: Proposal #${id}`;
+      }
+
+      async function updateVoteStatus(elId) {
+        if (!walletAddress || !contract) return;
+        try {
+          const vi = await contract.getVoterInfo(elId, walletAddress);
+          const btn = document.getElementById("castVoteBtn");
+          const status = document.getElementById("voteStatus");
+          if (!vi.isRegistered) {
+            btn.disabled = true;
+            status.textContent = "⚠ Not registered for this election";
+          } else if (vi.hasVoted) {
+            btn.disabled = true;
+            status.textContent =
+              vi.delegate !== ethers.ZeroAddress
+                ? `✓ Delegated to ${vi.delegate.slice(0, 6)}…${vi.delegate.slice(-4)}`
+                : `✓ Voted for Proposal #${vi.votedProposalId}`;
+          } else {
+            status.textContent = `Registered · Weight: ${vi.weight}`;
+          }
+        } catch {}
+      }
+
+      async function renderResults(elId) {
+        const view = document.getElementById("resultsView");
+        try {
+          const props = await contract.getAllProposals(elId);
+          if (!props.length) {
+            view.innerHTML = '<div class="empty">No proposals yet</div>';
+            return;
+          }
+          const totalVotes = elections[elId].totalVotes;
+
+          const sorted = [...props.map((p, i) => ({ ...p, i }))].sort((a, b) =>
+            Number(b.voteCount - a.voteCount),
+          );
+          view.innerHTML = sorted
+            .map((p, rank) => {
+              const pct =
+                totalVotes > 0n ? Number((p.voteCount * 100n) / totalVotes) : 0;
+              const isWinner = elections[elId].resultsFinalized && rank === 0;
+              return `
+        <div style="margin-bottom:.85rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+            <span style="font-weight:700;font-size:.95rem">${isWinner ? "🏆 " : ""}${p.name}</span>
+            <span style="font-family:var(--mono);font-size:.8rem;color:var(--accent)">${p.voteCount.toString()} votes · ${pct}%</span>
+          </div>
+          <div class="vote-bar" style="height:6px">
+            <div class="vote-bar-fill" style="width:${pct}%;background:${isWinner ? "var(--green)" : "linear-gradient(90deg,var(--accent),var(--accent2))"}"></div>
+          </div>
+        </div>`;
+            })
+            .join("");
+        } catch {}
+      }
+
+      function renderFinalizeSection(elId) {
+        const el = elections[elId];
+        const isAdmin =
+          walletAddress && walletAddress.toLowerCase() === contractAdmin;
+        const sec = document.getElementById("finalizeSection");
+        if (
+          !isAdmin ||
+          el.resultsFinalized ||
+          el.status !== "Ended - Awaiting Finalization"
+        ) {
+          sec.innerHTML = el.resultsFinalized
+            ? '<div style="color:var(--green);font-size:.85rem;font-family:var(--mono)">✓ Results are finalized</div>'
+            : "";
+          return;
+        }
+        sec.innerHTML = `<button class="btn btn-danger" id="finalizeBtn" onclick="finalizeElection()">Finalize Election & Declare Winner</button>`;
+      }
+
+      // ─────────────────────────── ACTIONS ───────────────────────────
+      document
+        .getElementById("createElBtn")
+        .addEventListener("click", async () => {
+          const title = document.getElementById("elTitle").value.trim();
+          const start =
+            new Date(document.getElementById("elStart").value).getTime() / 1000;
+          const end =
+            new Date(document.getElementById("elEnd").value).getTime() / 1000;
+          if (!title || !start || !end) {
+            toast("Fill in all fields", "error");
+            return;
+          }
+          const btn = document.getElementById("createElBtn");
+          setLoading(btn, true);
+          try {
+            const tx = await contract.createElection(
+              title,
+              BigInt(Math.floor(start)),
+              BigInt(Math.floor(end)),
+            );
+            await tx.wait();
+            toast("Election created!", "success", tx.hash);
+            await loadElections();
+          } catch (e) {
+            toast(e.reason || e.message, "error");
+          }
+          setLoading(btn, false);
+        });
+
+      document
+        .getElementById("castVoteBtn")
+        .addEventListener("click", async () => {
+          if (selectedProposalId === null || currentElectionId === null) return;
+          const btn = document.getElementById("castVoteBtn");
+          setLoading(btn, true);
+          try {
+            const tx = await contract.castVote(
+              currentElectionId,
+              selectedProposalId,
+            );
+            await tx.wait();
+            toast("Vote cast successfully!", "success", tx.hash);
+            await loadElections();
+            await renderElection(currentElectionId);
+          } catch (e) {
+            toast(e.reason || e.message, "error");
+          }
+          setLoading(btn, false);
+        });
+
+      document
+        .getElementById("delegateBtn")
+        .addEventListener("click", async () => {
+          const addr = document.getElementById("delegateAddr").value.trim();
+          if (!ethers.isAddress(addr)) {
+            toast("Invalid address", "error");
+            return;
+          }
+          const btn = document.getElementById("delegateBtn");
+          setLoading(btn, true);
+          try {
+            const tx = await contract.delegateVote(currentElectionId, addr);
+            await tx.wait();
+            toast("Vote delegated!", "success", tx.hash);
+            await updateVoteStatus(currentElectionId);
+          } catch (e) {
+            toast(e.reason || e.message, "error");
+          }
+          setLoading(btn, false);
+        });
+
+      document
+        .getElementById("addPropBtn")
+        .addEventListener("click", async () => {
+          const name = document.getElementById("propName").value.trim();
+          const desc = document.getElementById("propDesc").value.trim();
+          if (!name) {
+            toast("Proposal name is required", "error");
+            return;
+          }
+          const btn = document.getElementById("addPropBtn");
+          setLoading(btn, true);
+          try {
+            const tx = await contract.addProposal(
+              currentElectionId,
+              name,
+              desc,
+            );
+            await tx.wait();
+            toast("Proposal added!", "success", tx.hash);
+            await renderProposals(currentElectionId);
+            document.getElementById("propName").value = "";
+            document.getElementById("propDesc").value = "";
+          } catch (e) {
+            toast(e.reason || e.message, "error");
+          }
+          setLoading(btn, false);
+        });
+
+      document
+        .getElementById("regVotersBtn")
+        .addEventListener("click", async () => {
+          const raw = document.getElementById("voterAddrs").value.trim();
+          const addrs = raw
+            .split(/[\n,]+/)
+            .map((a) => a.trim())
+            .filter(ethers.isAddress);
+          if (!addrs.length) {
+            toast("No valid addresses found", "error");
+            return;
+          }
+          const btn = document.getElementById("regVotersBtn");
+          setLoading(btn, true);
+          try {
+            const tx = await contract.registerVotersBatch(
+              currentElectionId,
+              addrs,
+            );
+            await tx.wait();
+            toast(`${addrs.length} voter(s) registered!`, "success", tx.hash);
+            document.getElementById("voterAddrs").value = "";
+          } catch (e) {
+            toast(e.reason || e.message, "error");
+          }
+          setLoading(btn, false);
+        });
+
+      async function finalizeElection() {
+        const btn = document.getElementById("finalizeBtn");
+        if (!btn) return;
+        setLoading(btn, true);
+        try {
+          const tx = await contract.finalizeElection(currentElectionId);
+          await tx.wait();
+          toast("Election finalized!", "success", tx.hash);
+          await loadElections();
+          await renderElection(currentElectionId);
+        } catch (e) {
+          toast(e.reason || e.message, "error");
+        }
+        setLoading(btn, false);
+      }
+
+      // ─────────────────────────── TABS ───────────────────────────
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-content")
+            .forEach((t) => t.classList.remove("active"));
+          tab.classList.add("active");
+          document
+            .getElementById(`tab-${tab.dataset.tab}`)
+            .classList.add("active");
+          if (tab.dataset.tab === "results" && currentElectionId !== null)
+            renderResults(currentElectionId);
+        });
+      });
+
+      // ─────────────────────────── AUTO-CONNECT ───────────────────────────
+      window.addEventListener("load", async () => {
+        const eth = await waitForEthereum();
+        if (eth?.selectedAddress) await connectWallet();
+        eth?.on("accountsChanged", async () => {
+          walletAddress = null;
+          signer = null;
+          await connectWallet();
+        });
+        eth?.on("chainChanged", () => location.reload());
+      });
+    </script>
+  </body>
+</html>
