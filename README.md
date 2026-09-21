@@ -104,7 +104,7 @@ voter_db
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
+git clone https://github.com/bhavyaweb3/decentralized-voting-system.git
 ```
 
 ### 2. Open the Project
