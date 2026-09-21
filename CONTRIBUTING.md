@@ -13,7 +13,7 @@ Create a fork of this repository on GitHub.
 ### 2. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
+https://github.com/bhavyweb3/Decentralized-Voting-System.git
 ```
 
 ### 3. Create a Branch
